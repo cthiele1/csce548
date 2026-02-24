@@ -5,7 +5,7 @@ CREATE → READ → UPDATE → READ → DELETE → READ on each entity.
 
 USAGE:
   # Test against Railway deployment:
-  BASE_URL=https://your-app.up.railway.app python client.py
+  $env:BASE_URL="https://your-app.up.railway.app"; python client.py
 
   # Test against local server:
   python client.py
@@ -15,7 +15,11 @@ import os
 import sys
 import json
 import requests
+import time
 from datetime import date, timedelta
+
+# Unique suffix so re-runs never hit duplicate email errors
+TS = str(int(time.time()))
 
 # ─────────────────────────────────────────────
 # CONFIG
@@ -42,13 +46,24 @@ def step(num, description):
 
 
 def check(response, label=""):
-    body = response.json()
-    if response.status_code == 200 and body.get("success"):
+    try:
+        body = response.json()
+    except Exception:
+        print(f"  {FAIL} FAILED (HTTP {response.status_code}) - Server returned non-JSON:")
+        print(f"     {response.text[:300] or '(empty response)'}")
+        return None
+
+    # accept 200/201 as success codes (server may return 201 on create)
+    if response.status_code in (200, 201) and body.get("success"):
         print(f"  {PASS} {label or 'OK'}")
         print(f"     Response: {json.dumps(body.get('data'), indent=4, default=str)}")
         return body.get("data")
     else:
-        print(f"  {FAIL} FAILED: {body.get('error', 'Unknown error')}")
+        err = body.get("error", None)
+        if err:
+            print(f"  {FAIL} FAILED (HTTP {response.status_code}): {err}")
+        else:
+            print(f"  {FAIL} FAILED (HTTP {response.status_code}): {body}")
         return None
 
 
@@ -59,20 +74,23 @@ def check(response, label=""):
 def test_runners():
     header("Testing Runner CRUD Operations")
     runner_id = None
+    email = f"test.runner.{TS}@example.com"
 
     step(1, "CREATE - Adding new runner...")
     r = requests.post(f"{BASE_URL}/runners", json={
         "first_name": "Test",
         "last_name": "Runner",
-        "email": "test.runner@example.com",
+        "email": email,
         "date_of_birth": "1990-06-15",
         "gender": "M",
         "weight_lbs": 160,
         "height_inches": 70
     })
     data = check(r, "Runner created")
-    if data:
-        runner_id = data["runner_id"]
+    if not data:
+        print("  Aborting runner tests due to failed create.")
+        return
+    runner_id = data["runner_id"]
 
     step(2, f"READ - Retrieving runner ID {runner_id}...")
     r = requests.get(f"{BASE_URL}/runners/{runner_id}")
@@ -82,7 +100,7 @@ def test_runners():
     r = requests.put(f"{BASE_URL}/runners/{runner_id}", json={
         "first_name": "Test",
         "last_name": "Runner",
-        "email": "test.runner@example.com",
+        "email": email,
         "weight_lbs": 155,
         "height_inches": 70
     })
@@ -100,35 +118,43 @@ def test_runners():
 
     step(6, f"READ (verify delete) - Runner {runner_id} should not be found...")
     r = requests.get(f"{BASE_URL}/runners/{runner_id}")
-    body = r.json()
-    if not body.get("success"):
-        print(f"  {PASS} Correctly returned not found: {body.get('error')}")
-    else:
-        print(f"  {FAIL} Runner still exists after delete!")
+    try:
+        body = r.json()
+        if not body.get("success"):
+            print(f"  {PASS} Correctly returned not found: {body.get('error')}")
+        else:
+            print(f"  {FAIL} Runner still exists after delete!")
+    except Exception:
+        # 404s from Flask may not be JSON - that's still correct behavior
+        if r.status_code in (400, 404):
+            print(f"  {PASS} Correctly returned {r.status_code} - runner not found")
+        else:
+            print(f"  {FAIL} Unexpected status {r.status_code}")
 
     print("\n  Runner CRUD test complete!")
-    return runner_id
 
 
 # ─────────────────────────────────────────────
 # RUN CRUD TEST
 # ─────────────────────────────────────────────
 
-def test_runs(runner_id):
+def test_runs():
     header("Testing Run CRUD Operations")
     run_id = None
 
-    # First create a temporary runner to own this run
     step(0, "Setup - Creating a temporary runner for run tests...")
     r = requests.post(f"{BASE_URL}/runners", json={
         "first_name": "Temp",
         "last_name": "Runner",
-        "email": "temp@example.com",
+        "email": f"temp.{TS}@example.com",
         "date_of_birth": "1985-01-01",
         "gender": "F"
     })
     data = check(r, "Temp runner created")
-    temp_runner_id = data["runner_id"] if data else None
+    if not data:
+        print("  Aborting run tests due to failed runner create.")
+        return
+    temp_runner_id = data["runner_id"]
 
     step(1, "CREATE - Logging a new run...")
     r = requests.post(f"{BASE_URL}/runs", json={
@@ -142,8 +168,16 @@ def test_runs(runner_id):
         "notes": "Test run via client"
     })
     data = check(r, "Run logged")
-    if data:
-        run_id = data["run_id"]
+    if not data:
+        print("  Aborting run tests due to failed run create.")
+        # cleanup temp runner before returning
+        if temp_runner_id:
+            try:
+                requests.delete(f"{BASE_URL}/runners/{temp_runner_id}")
+            except Exception:
+                pass
+        return
+    run_id = data["run_id"]
 
     step(2, f"READ - Retrieving run ID {run_id}...")
     r = requests.get(f"{BASE_URL}/runs/{run_id}")
@@ -159,14 +193,18 @@ def test_runs(runner_id):
 
     step(4, f"READ - Runner {temp_runner_id}'s runs...")
     r = requests.get(f"{BASE_URL}/runs?runner_id={temp_runner_id}")
-    data = check(r, "Runner's runs retrieved")
+    check(r, "Runner's runs retrieved")
 
     step(5, f"DELETE - Removing run ID {run_id}...")
     r = requests.delete(f"{BASE_URL}/runs/{run_id}")
     check(r, "Run deleted")
 
     # Cleanup temp runner
-    requests.delete(f"{BASE_URL}/runners/{temp_runner_id}")
+    if temp_runner_id:
+        try:
+            requests.delete(f"{BASE_URL}/runners/{temp_runner_id}")
+        except Exception:
+            pass
     print("\n  Run CRUD test complete!")
 
 
@@ -177,16 +215,18 @@ def test_runs(runner_id):
 def test_routes():
     header("Testing Route CRUD Operations")
 
-    # Need a runner first
     r = requests.post(f"{BASE_URL}/runners", json={
         "first_name": "Route",
         "last_name": "Tester",
-        "email": "route.tester@example.com",
+        "email": f"route.{TS}@example.com",
         "date_of_birth": "1992-03-20",
         "gender": "M"
     })
     data = check(r, "Temp runner created")
-    temp_runner_id = data["runner_id"] if data else None
+    if not data:
+        print("  Aborting route tests due to failed runner create.")
+        return
+    temp_runner_id = data["runner_id"]
 
     step(1, "CREATE - Adding a new route...")
     r = requests.post(f"{BASE_URL}/routes", json={
@@ -199,7 +239,15 @@ def test_routes():
         "start_location": "City Park"
     })
     data = check(r, "Route created")
-    route_id = data["route_id"] if data else None
+    if not data:
+        print("  Aborting route tests due to failed route create.")
+        if temp_runner_id:
+            try:
+                requests.delete(f"{BASE_URL}/runners/{temp_runner_id}")
+            except Exception:
+                pass
+        return
+    route_id = data["route_id"]
 
     step(2, f"READ - Retrieving route ID {route_id}...")
     r = requests.get(f"{BASE_URL}/routes/{route_id}")
@@ -218,7 +266,11 @@ def test_routes():
     r = requests.delete(f"{BASE_URL}/routes/{route_id}")
     check(r, "Route deleted")
 
-    requests.delete(f"{BASE_URL}/runners/{temp_runner_id}")
+    if temp_runner_id:
+        try:
+            requests.delete(f"{BASE_URL}/runners/{temp_runner_id}")
+        except Exception:
+            pass
     print("\n  Route CRUD test complete!")
 
 
@@ -232,12 +284,15 @@ def test_shoes():
     r = requests.post(f"{BASE_URL}/runners", json={
         "first_name": "Shoe",
         "last_name": "Tester",
-        "email": "shoe.tester@example.com",
+        "email": f"shoe.{TS}@example.com",
         "date_of_birth": "1988-11-05",
         "gender": "F"
     })
     data = check(r, "Temp runner created")
-    temp_runner_id = data["runner_id"] if data else None
+    if not data:
+        print("  Aborting shoe tests due to failed runner create.")
+        return
+    temp_runner_id = data["runner_id"]
 
     step(1, "CREATE - Adding a new shoe...")
     r = requests.post(f"{BASE_URL}/shoes", json={
@@ -250,7 +305,15 @@ def test_shoes():
         "notes": "Test shoe"
     })
     data = check(r, "Shoe created")
-    shoe_id = data["shoe_id"] if data else None
+    if not data:
+        print("  Aborting shoe tests due to failed shoe create.")
+        if temp_runner_id:
+            try:
+                requests.delete(f"{BASE_URL}/runners/{temp_runner_id}")
+            except Exception:
+                pass
+        return
+    shoe_id = data["shoe_id"]
 
     step(2, f"READ - Retrieving shoe ID {shoe_id}...")
     r = requests.get(f"{BASE_URL}/shoes/{shoe_id}")
@@ -270,7 +333,11 @@ def test_shoes():
     r = requests.delete(f"{BASE_URL}/shoes/{shoe_id}")
     check(r, "Shoe deleted")
 
-    requests.delete(f"{BASE_URL}/runners/{temp_runner_id}")
+    if temp_runner_id:
+        try:
+            requests.delete(f"{BASE_URL}/runners/{temp_runner_id}")
+        except Exception:
+            pass
     print("\n  Shoe CRUD test complete!")
 
 
@@ -284,12 +351,15 @@ def test_goals():
     r = requests.post(f"{BASE_URL}/runners", json={
         "first_name": "Goal",
         "last_name": "Tester",
-        "email": "goal.tester@example.com",
+        "email": f"goal.{TS}@example.com",
         "date_of_birth": "1995-07-14",
         "gender": "M"
     })
     data = check(r, "Temp runner created")
-    temp_runner_id = data["runner_id"] if data else None
+    if not data:
+        print("  Aborting goal tests due to failed runner create.")
+        return
+    temp_runner_id = data["runner_id"]
 
     future_date = str(date.today() + timedelta(days=90))
 
@@ -304,7 +374,15 @@ def test_goals():
         "description": "Run 100 miles this quarter"
     })
     data = check(r, "Goal created")
-    goal_id = data["goal_id"] if data else None
+    if not data:
+        print("  Aborting goal tests due to failed goal create.")
+        if temp_runner_id:
+            try:
+                requests.delete(f"{BASE_URL}/runners/{temp_runner_id}")
+            except Exception:
+                pass
+        return
+    goal_id = data["goal_id"]
 
     step(2, f"READ - Retrieving goal ID {goal_id} (with progress %)...")
     r = requests.get(f"{BASE_URL}/goals/{goal_id}")
@@ -324,7 +402,11 @@ def test_goals():
     r = requests.delete(f"{BASE_URL}/goals/{goal_id}")
     check(r, "Goal deleted")
 
-    requests.delete(f"{BASE_URL}/runners/{temp_runner_id}")
+    if temp_runner_id:
+        try:
+            requests.delete(f"{BASE_URL}/runners/{temp_runner_id}")
+        except Exception:
+            pass
     print("\n  Goal CRUD test complete!")
 
 
@@ -352,7 +434,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     test_runners()
-    test_runs(None)
+    test_runs()
     test_routes()
     test_shoes()
     test_goals()

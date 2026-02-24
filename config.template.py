@@ -6,10 +6,11 @@ Copy this to config.py and update with your credentials
 DB_CONFIG = {
     'host': 'localhost',
     'user': 'root',
-    'password': 'YOUR_PASSWORD_HERE',  # CHANGE THIS!
+    'password': 'connor',   # Updated
     'database': 'running_tracker',
     'raise_on_warnings': True
 }
+
 
 # After copying this file to config.py:
 # 1. Update the password field with your MySQL password
