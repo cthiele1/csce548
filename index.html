@@ -1,0 +1,1316 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Running Tracker</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #0a0a0a;
+        --surface: #111111;
+        --surface2: #1a1a1a;
+        --border: #2a2a2a;
+        --accent: #c8ff00;
+        --accent2: #ff6b35;
+        --text: #f0f0f0;
+        --muted: #666;
+        --danger: #ff4444;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: "DM Sans", sans-serif;
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+
+      /* ── HEADER ── */
+      header {
+        border-bottom: 1px solid var(--border);
+        padding: 0 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 64px;
+        position: sticky;
+        top: 0;
+        background: rgba(10, 10, 10, 0.95);
+        backdrop-filter: blur(12px);
+        z-index: 100;
+      }
+
+      .logo {
+        font-family: "Bebas Neue", sans-serif;
+        font-size: 1.6rem;
+        letter-spacing: 0.08em;
+        color: var(--accent);
+      }
+
+      .logo span {
+        color: var(--text);
+      }
+
+      .api-config {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .api-config label {
+        font-family: "DM Mono", monospace;
+        font-size: 0.7rem;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+      }
+
+      .api-config input {
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        color: var(--text);
+        font-family: "DM Mono", monospace;
+        font-size: 0.75rem;
+        padding: 0.4rem 0.75rem;
+        border-radius: 4px;
+        width: 260px;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+
+      .api-config input:focus {
+        border-color: var(--accent);
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--muted);
+        transition: background 0.3s;
+        flex-shrink: 0;
+      }
+      .status-dot.online {
+        background: var(--accent);
+        box-shadow: 0 0 8px var(--accent);
+      }
+      .status-dot.offline {
+        background: var(--danger);
+      }
+
+      /* ── LAYOUT ── */
+      .layout {
+        display: grid;
+        grid-template-columns: 200px 1fr;
+        min-height: calc(100vh - 64px);
+      }
+
+      /* ── SIDEBAR ── */
+      nav {
+        border-right: 1px solid var(--border);
+        padding: 1.5rem 0;
+        position: sticky;
+        top: 64px;
+        height: calc(100vh - 64px);
+        overflow-y: auto;
+      }
+
+      .nav-section {
+        padding: 0 1rem 1.5rem;
+      }
+
+      .nav-label {
+        font-family: "DM Mono", monospace;
+        font-size: 0.6rem;
+        text-transform: uppercase;
+        letter-spacing: 0.15em;
+        color: var(--muted);
+        padding: 0 0.5rem 0.5rem;
+      }
+
+      .nav-btn {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        width: 100%;
+        background: none;
+        border: none;
+        color: #888;
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.85rem;
+        font-weight: 400;
+        padding: 0.55rem 0.75rem;
+        border-radius: 6px;
+        cursor: pointer;
+        text-align: left;
+        transition: all 0.15s;
+      }
+
+      .nav-btn:hover {
+        background: var(--surface2);
+        color: var(--text);
+      }
+
+      .nav-btn.active {
+        background: var(--surface2);
+        color: var(--accent);
+        font-weight: 500;
+      }
+
+      .nav-btn .icon {
+        font-size: 1rem;
+        opacity: 0.8;
+      }
+
+      /* ── MAIN ── */
+      main {
+        padding: 2rem;
+        overflow-y: auto;
+      }
+
+      /* ── PAGE HEADER ── */
+      .page-header {
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 1rem;
+      }
+
+      .page-title {
+        font-family: "Bebas Neue", sans-serif;
+        font-size: 2.8rem;
+        letter-spacing: 0.05em;
+        line-height: 1;
+      }
+
+      .page-title span {
+        color: var(--accent);
+      }
+
+      .page-meta {
+        font-family: "DM Mono", monospace;
+        font-size: 0.7rem;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+      }
+
+      /* ── FILTERS BAR ── */
+      .filters {
+        display: flex;
+        gap: 0.75rem;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+      }
+
+      .filter-input {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        color: var(--text);
+        font-family: "DM Mono", monospace;
+        font-size: 0.78rem;
+        padding: 0.5rem 0.9rem;
+        border-radius: 6px;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+
+      .filter-input:focus {
+        border-color: var(--accent);
+      }
+      .filter-input::placeholder {
+        color: var(--muted);
+      }
+
+      .btn {
+        background: var(--accent);
+        color: #000;
+        border: none;
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.8rem;
+        font-weight: 600;
+        padding: 0.5rem 1.1rem;
+        border-radius: 6px;
+        cursor: pointer;
+        transition:
+          opacity 0.15s,
+          transform 0.1s;
+        letter-spacing: 0.03em;
+      }
+
+      .btn:hover {
+        opacity: 0.85;
+      }
+      .btn:active {
+        transform: scale(0.97);
+      }
+
+      .btn-outline {
+        background: none;
+        border: 1px solid var(--border);
+        color: var(--text);
+      }
+
+      .btn-outline:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+        background: none;
+      }
+
+      /* ── TABLE ── */
+      .table-wrap {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+        animation: fadeIn 0.3s ease;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.83rem;
+      }
+
+      thead {
+        background: var(--surface2);
+        border-bottom: 1px solid var(--border);
+      }
+
+      thead th {
+        font-family: "DM Mono", monospace;
+        font-size: 0.65rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--muted);
+        padding: 0.75rem 1rem;
+        text-align: left;
+      }
+
+      tbody tr {
+        border-bottom: 1px solid var(--border);
+        transition: background 0.1s;
+        cursor: pointer;
+      }
+
+      tbody tr:last-child {
+        border-bottom: none;
+      }
+      tbody tr:hover {
+        background: var(--surface2);
+      }
+
+      tbody td {
+        padding: 0.75rem 1rem;
+        color: var(--text);
+        font-weight: 300;
+      }
+
+      .td-id {
+        font-family: "DM Mono", monospace;
+        font-size: 0.7rem;
+        color: var(--muted);
+      }
+
+      .badge {
+        display: inline-block;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        font-family: "DM Mono", monospace;
+        font-size: 0.65rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+
+      .badge-green {
+        background: rgba(200, 255, 0, 0.12);
+        color: var(--accent);
+      }
+      .badge-orange {
+        background: rgba(255, 107, 53, 0.12);
+        color: var(--accent2);
+      }
+      .badge-gray {
+        background: rgba(255, 255, 255, 0.06);
+        color: #aaa;
+      }
+      .badge-red {
+        background: rgba(255, 68, 68, 0.12);
+        color: var(--danger);
+      }
+
+      /* ── DETAIL PANEL ── */
+      .detail-panel {
+        margin-top: 1.5rem;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+        animation: fadeIn 0.25s ease;
+      }
+
+      .detail-header {
+        background: var(--surface2);
+        border-bottom: 1px solid var(--border);
+        padding: 0.75rem 1.25rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .detail-title {
+        font-family: "DM Mono", monospace;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--accent);
+      }
+
+      .detail-body {
+        padding: 1.25rem;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 1rem;
+      }
+
+      .detail-field label {
+        font-family: "DM Mono", monospace;
+        font-size: 0.6rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--muted);
+        display: block;
+        margin-bottom: 0.25rem;
+      }
+
+      .detail-field .value {
+        font-size: 0.9rem;
+        font-weight: 400;
+        color: var(--text);
+        word-break: break-word;
+      }
+
+      /* ── STATS STRIP ── */
+      .stats-strip {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .stat-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 1rem;
+        animation: fadeIn 0.3s ease;
+      }
+
+      .stat-card .stat-label {
+        font-family: "DM Mono", monospace;
+        font-size: 0.6rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--muted);
+        margin-bottom: 0.3rem;
+      }
+
+      .stat-card .stat-value {
+        font-family: "Bebas Neue", sans-serif;
+        font-size: 2rem;
+        letter-spacing: 0.04em;
+        color: var(--accent);
+        line-height: 1;
+      }
+
+      /* ── EMPTY / LOADING ── */
+      .empty {
+        padding: 3rem;
+        text-align: center;
+        color: var(--muted);
+        font-size: 0.85rem;
+        font-family: "DM Mono", monospace;
+      }
+
+      .spinner {
+        display: inline-block;
+        width: 18px;
+        height: 18px;
+        border: 2px solid var(--border);
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+        vertical-align: middle;
+        margin-right: 0.5rem;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .error-msg {
+        padding: 1rem 1.25rem;
+        background: rgba(255, 68, 68, 0.08);
+        border: 1px solid rgba(255, 68, 68, 0.25);
+        border-radius: 8px;
+        color: #ff8888;
+        font-family: "DM Mono", monospace;
+        font-size: 0.78rem;
+        margin-bottom: 1rem;
+      }
+
+      /* ── SECTION TABS ── */
+      .sub-tabs {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1.5rem;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 0;
+      }
+
+      .sub-tab {
+        background: none;
+        border: none;
+        border-bottom: 2px solid transparent;
+        color: var(--muted);
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.82rem;
+        font-weight: 500;
+        padding: 0.5rem 1rem 0.75rem;
+        cursor: pointer;
+        transition: all 0.15s;
+        margin-bottom: -1px;
+      }
+
+      .sub-tab:hover {
+        color: var(--text);
+      }
+      .sub-tab.active {
+        color: var(--accent);
+        border-bottom-color: var(--accent);
+      }
+
+      /* hide all pages */
+      .page {
+        display: none;
+      }
+      .page.active {
+        display: block;
+      }
+
+      .close-btn {
+        background: none;
+        border: none;
+        color: var(--muted);
+        font-size: 1.1rem;
+        cursor: pointer;
+        padding: 0 0.25rem;
+        transition: color 0.15s;
+      }
+      .close-btn:hover {
+        color: var(--text);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="logo">RUN<span>TRACK</span></div>
+      <div class="api-config">
+        <label>API URL</label>
+        <input
+          type="text"
+          id="apiUrl"
+          value="http://localhost:5000"
+          placeholder="http://localhost:5000"
+        />
+        <div class="status-dot" id="statusDot" title="API status"></div>
+      </div>
+    </header>
+
+    <div class="layout">
+      <nav>
+        <div class="nav-section">
+          <div class="nav-label">Tables</div>
+          <button class="nav-btn active" onclick="showPage('runners')">
+            <span class="icon">🏃</span> Runners
+          </button>
+          <button class="nav-btn" onclick="showPage('runs')">
+            <span class="icon">📍</span> Runs
+          </button>
+          <button class="nav-btn" onclick="showPage('routes')">
+            <span class="icon">🗺️</span> Routes
+          </button>
+          <button class="nav-btn" onclick="showPage('shoes')">
+            <span class="icon">👟</span> Shoes
+          </button>
+          <button class="nav-btn" onclick="showPage('goals')">
+            <span class="icon">🎯</span> Goals
+          </button>
+        </div>
+      </nav>
+
+      <main>
+        <!-- ── RUNNERS ── -->
+        <div class="page active" id="page-runners">
+          <div class="page-header">
+            <div>
+              <div class="page-title">ALL <span>RUNNERS</span></div>
+              <div class="page-meta" id="runners-meta">Loading...</div>
+            </div>
+            <button class="btn" onclick="loadRunners()">↺ Refresh</button>
+          </div>
+          <div id="runners-stats" class="stats-strip"></div>
+          <div id="runners-error"></div>
+          <div id="runners-table"></div>
+          <div id="runner-detail"></div>
+        </div>
+
+        <!-- ── RUNS ── -->
+        <div class="page" id="page-runs">
+          <div class="page-header">
+            <div>
+              <div class="page-title">ALL <span>RUNS</span></div>
+              <div class="page-meta" id="runs-meta">Loading...</div>
+            </div>
+            <button class="btn" onclick="loadRuns()">↺ Refresh</button>
+          </div>
+          <div class="sub-tabs">
+            <button class="sub-tab active" onclick="switchRunsTab('all', this)">
+              All Runs
+            </button>
+            <button class="sub-tab" onclick="switchRunsTab('byRunner', this)">
+              By Runner
+            </button>
+          </div>
+          <div id="runs-by-runner-filter" style="display: none" class="filters">
+            <input
+              class="filter-input"
+              type="number"
+              id="runnerIdFilter"
+              placeholder="Runner ID"
+            />
+            <button class="btn" onclick="loadRunsByRunner()">Search</button>
+            <button
+              class="btn btn-outline"
+              onclick="
+                loadRuns();
+                switchRunsTab('all', document.querySelector('.sub-tab'));
+              "
+            >
+              Clear
+            </button>
+          </div>
+          <div id="runs-error"></div>
+          <div id="runs-stats" class="stats-strip"></div>
+          <div id="runs-table"></div>
+          <div id="run-detail"></div>
+        </div>
+
+        <!-- ── ROUTES ── -->
+        <div class="page" id="page-routes">
+          <div class="page-header">
+            <div>
+              <div class="page-title">ALL <span>ROUTES</span></div>
+              <div class="page-meta" id="routes-meta">Loading...</div>
+            </div>
+            <button class="btn" onclick="loadRoutes()">↺ Refresh</button>
+          </div>
+          <div id="routes-error"></div>
+          <div id="routes-table"></div>
+          <div id="route-detail"></div>
+        </div>
+
+        <!-- ── SHOES ── -->
+        <div class="page" id="page-shoes">
+          <div class="page-header">
+            <div>
+              <div class="page-title">ALL <span>SHOES</span></div>
+              <div class="page-meta" id="shoes-meta">Loading...</div>
+            </div>
+            <button class="btn" onclick="loadShoes()">↺ Refresh</button>
+          </div>
+          <div id="shoes-error"></div>
+          <div id="shoes-table"></div>
+          <div id="shoe-detail"></div>
+        </div>
+
+        <!-- ── GOALS ── -->
+        <div class="page" id="page-goals">
+          <div class="page-header">
+            <div>
+              <div class="page-title">TRAINING <span>GOALS</span></div>
+              <div class="page-meta" id="goals-meta">Loading...</div>
+            </div>
+            <button class="btn" onclick="loadGoals()">↺ Refresh</button>
+          </div>
+          <div class="sub-tabs">
+            <button
+              class="sub-tab active"
+              onclick="switchGoalsTab('all', this)"
+            >
+              All Goals
+            </button>
+            <button class="sub-tab" onclick="switchGoalsTab('byRunner', this)">
+              By Runner
+            </button>
+          </div>
+          <div
+            id="goals-by-runner-filter"
+            style="display: none"
+            class="filters"
+          >
+            <input
+              class="filter-input"
+              type="number"
+              id="goalRunnerIdFilter"
+              placeholder="Runner ID"
+            />
+            <button class="btn" onclick="loadGoalsByRunner()">Search</button>
+            <button
+              class="btn btn-outline"
+              onclick="
+                loadGoals();
+                switchGoalsTab(
+                  'all',
+                  document.querySelector('#page-goals .sub-tab'),
+                );
+              "
+            >
+              Clear
+            </button>
+          </div>
+          <div id="goals-error"></div>
+          <div id="goals-stats" class="stats-strip"></div>
+          <div id="goals-table"></div>
+          <div id="goal-detail"></div>
+        </div>
+      </main>
+    </div>
+
+    <script>
+      // ── API BASE URL ──────────────────────────────────────────
+      function getBase() {
+        return document.getElementById("apiUrl").value.replace(/\/$/, "");
+      }
+
+      // ── HEALTH CHECK ─────────────────────────────────────────
+      async function checkHealth() {
+        const dot = document.getElementById("statusDot");
+        try {
+          const r = await fetch(getBase() + "/health");
+          dot.className = r.ok ? "status-dot online" : "status-dot offline";
+        } catch {
+          dot.className = "status-dot offline";
+        }
+      }
+
+      document.getElementById("apiUrl").addEventListener("change", () => {
+        checkHealth();
+        loadCurrentPage();
+      });
+
+      // ── GENERIC FETCH ─────────────────────────────────────────
+      async function apiFetch(path) {
+        const r = await fetch(getBase() + path);
+        const json = await r.json();
+        if (!json.success) throw new Error(json.error || "Request failed");
+        return json.data;
+      }
+
+      // ── NAVIGATION ───────────────────────────────────────────
+      let currentPage = "runners";
+
+      function showPage(name) {
+        document
+          .querySelectorAll(".page")
+          .forEach((p) => p.classList.remove("active"));
+        document
+          .querySelectorAll(".nav-btn")
+          .forEach((b) => b.classList.remove("active"));
+        document.getElementById("page-" + name).classList.add("active");
+        document.querySelectorAll(".nav-btn").forEach((b) => {
+          if (b.textContent.trim().toLowerCase().includes(name.slice(0, 4)))
+            b.classList.add("active");
+        });
+        currentPage = name;
+        loadCurrentPage();
+      }
+
+      function loadCurrentPage() {
+        const loaders = {
+          runners: loadRunners,
+          runs: loadRuns,
+          routes: loadRoutes,
+          shoes: loadShoes,
+          goals: loadGoals,
+        };
+        loaders[currentPage]?.();
+      }
+
+      // ── HELPERS ───────────────────────────────────────────────
+      function showError(containerId, msg) {
+        document.getElementById(containerId).innerHTML =
+          `<div class="error-msg">⚠ ${msg}</div>`;
+      }
+
+      function clearError(containerId) {
+        document.getElementById(containerId).innerHTML = "";
+      }
+
+      function loading(containerId) {
+        document.getElementById(containerId).innerHTML =
+          `<div class="empty"><span class="spinner"></span>Loading...</div>`;
+      }
+
+      function fmtDate(s) {
+        if (!s) return "—";
+        return new Date(s).toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        });
+      }
+
+      function fmtNum(n, decimals = 1) {
+        if (n == null) return "—";
+        return parseFloat(n).toFixed(decimals);
+      }
+
+      // ── RUNNERS ───────────────────────────────────────────────
+      async function loadRunners() {
+        loading("runners-table");
+        clearError("runners-error");
+        document.getElementById("runner-detail").innerHTML = "";
+        try {
+          const data = await apiFetch("/runners");
+          document.getElementById("runners-meta").textContent =
+            `${data.length} records`;
+
+          // Stats
+          document.getElementById("runners-stats").innerHTML = `
+      <div class="stat-card"><div class="stat-label">Total Runners</div><div class="stat-value">${data.length}</div></div>
+      <div class="stat-card"><div class="stat-label">Male</div><div class="stat-value">${data.filter((r) => r.gender === "M").length}</div></div>
+      <div class="stat-card"><div class="stat-label">Female</div><div class="stat-value">${data.filter((r) => r.gender === "F").length}</div></div>
+      <div class="stat-card"><div class="stat-label">Avg Weight (lbs)</div><div class="stat-value">${fmtNum(data.reduce((s, r) => s + (parseFloat(r.weight_lbs) || 0), 0) / data.filter((r) => r.weight_lbs).length, 0)}</div></div>
+    `;
+
+          if (!data.length) {
+            document.getElementById("runners-table").innerHTML =
+              '<div class="empty">No runners found.</div>';
+            return;
+          }
+
+          document.getElementById("runners-table").innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>ID</th><th>Name</th><th>Email</th><th>Gender</th><th>DOB</th><th>Weight</th><th>Height</th><th>Joined</th>
+          </tr></thead>
+          <tbody>
+            ${data
+              .map(
+                (r) => `
+              <tr onclick="loadRunnerDetail(${r.runner_id})">
+                <td class="td-id">#${r.runner_id}</td>
+                <td><strong>${r.first_name} ${r.last_name}</strong></td>
+                <td style="color:var(--muted);font-family:'DM Mono',monospace;font-size:0.75rem">${r.email}</td>
+                <td><span class="badge ${r.gender === "M" ? "badge-green" : r.gender === "F" ? "badge-orange" : "badge-gray"}">${r.gender || "?"}</span></td>
+                <td>${fmtDate(r.date_of_birth)}</td>
+                <td>${r.weight_lbs ? fmtNum(r.weight_lbs, 1) + " lbs" : "—"}</td>
+                <td>${r.height_inches ? r.height_inches + '"' : "—"}</td>
+                <td style="color:var(--muted);font-size:0.78rem">${fmtDate(r.created_at)}</td>
+              </tr>
+            `,
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </div>`;
+        } catch (e) {
+          showError("runners-error", e.message);
+          document.getElementById("runners-table").innerHTML = "";
+        }
+      }
+
+      async function loadRunnerDetail(id) {
+        const el = document.getElementById("runner-detail");
+        el.innerHTML = `<div class="detail-panel"><div class="detail-body"><div class="empty"><span class="spinner"></span></div></div></div>`;
+        try {
+          const r = await apiFetch("/runners/" + id);
+          el.innerHTML = `
+      <div class="detail-panel">
+        <div class="detail-header">
+          <span class="detail-title">Runner #${id} — Detail View</span>
+          <button class="close-btn" onclick="document.getElementById('runner-detail').innerHTML=''">✕</button>
+        </div>
+        <div class="detail-body">
+          ${Object.entries(r)
+            .map(
+              ([k, v]) => `
+            <div class="detail-field">
+              <label>${k.replace(/_/g, " ")}</label>
+              <div class="value">${v ?? "—"}</div>
+            </div>`,
+            )
+            .join("")}
+        </div>
+      </div>`;
+        } catch (e) {
+          el.innerHTML = `<div class="error-msg">⚠ ${e.message}</div>`;
+        }
+      }
+
+      // ── RUNS ─────────────────────────────────────────────────
+      async function loadRuns() {
+        loading("runs-table");
+        clearError("runs-error");
+        document.getElementById("run-detail").innerHTML = "";
+        try {
+          const data = await apiFetch("/runs");
+          renderRuns(data);
+        } catch (e) {
+          showError("runs-error", e.message);
+          document.getElementById("runs-table").innerHTML = "";
+        }
+      }
+
+      async function loadRunsByRunner() {
+        const id = document.getElementById("runnerIdFilter").value.trim();
+        if (!id) return loadRuns();
+        loading("runs-table");
+        clearError("runs-error");
+        document.getElementById("run-detail").innerHTML = "";
+        try {
+          const data = await apiFetch("/runs?runner_id=" + id);
+          renderRuns(data, `Runner #${id}`);
+        } catch (e) {
+          showError("runs-error", e.message);
+          document.getElementById("runs-table").innerHTML = "";
+        }
+      }
+
+      function renderRuns(data, subtitle = "") {
+        document.getElementById("runs-meta").textContent = subtitle
+          ? `${data.length} records — ${subtitle}`
+          : `${data.length} records`;
+
+        const totalMiles = data.reduce(
+          (s, r) => s + (parseFloat(r.distance_miles) || 0),
+          0,
+        );
+        const totalMins = data.reduce(
+          (s, r) => s + (parseInt(r.duration_minutes) || 0),
+          0,
+        );
+        document.getElementById("runs-stats").innerHTML = `
+    <div class="stat-card"><div class="stat-label">Total Runs</div><div class="stat-value">${data.length}</div></div>
+    <div class="stat-card"><div class="stat-label">Total Miles</div><div class="stat-value">${fmtNum(totalMiles, 1)}</div></div>
+    <div class="stat-card"><div class="stat-label">Total Hours</div><div class="stat-value">${fmtNum(totalMins / 60, 1)}</div></div>
+    <div class="stat-card"><div class="stat-label">Avg Distance</div><div class="stat-value">${data.length ? fmtNum(totalMiles / data.length, 1) : 0}</div></div>
+  `;
+
+        if (!data.length) {
+          document.getElementById("runs-table").innerHTML =
+            '<div class="empty">No runs found.</div>';
+          return;
+        }
+
+        const typeColor = (t) =>
+          ({
+            Long: "badge-green",
+            Easy: "badge-gray",
+            Tempo: "badge-orange",
+            Interval: "badge-orange",
+            Race: "badge-red",
+            Recovery: "badge-gray",
+          })[t] || "badge-gray";
+
+        document.getElementById("runs-table").innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>ID</th><th>Runner</th><th>Date</th><th>Distance</th><th>Duration</th><th>Pace</th><th>Type</th><th>Calories</th>
+        </tr></thead>
+        <tbody>
+          ${data
+            .map(
+              (r) => `
+            <tr onclick="loadRunDetail(${r.run_id})">
+              <td class="td-id">#${r.run_id}</td>
+              <td class="td-id">Runner #${r.runner_id}</td>
+              <td>${fmtDate(r.run_date)}</td>
+              <td><strong>${fmtNum(r.distance_miles, 2)} mi</strong></td>
+              <td>${r.duration_minutes} min</td>
+              <td style="font-family:'DM Mono',monospace;font-size:0.75rem">${r.pace_min_per_mile ? fmtNum(r.pace_min_per_mile, 2) + "/mi" : "—"}</td>
+              <td><span class="badge ${typeColor(r.run_type)}">${r.run_type || "—"}</span></td>
+              <td>${r.calories_burned || "—"}</td>
+            </tr>
+          `,
+            )
+            .join("")}
+        </tbody>
+      </table>
+    </div>`;
+      }
+
+      async function loadRunDetail(id) {
+        const el = document.getElementById("run-detail");
+        el.innerHTML = `<div class="detail-panel"><div class="detail-body"><div class="empty"><span class="spinner"></span></div></div></div>`;
+        try {
+          const r = await apiFetch("/runs/" + id);
+          el.innerHTML = `
+      <div class="detail-panel">
+        <div class="detail-header">
+          <span class="detail-title">Run #${id} — Detail View</span>
+          <button class="close-btn" onclick="document.getElementById('run-detail').innerHTML=''">✕</button>
+        </div>
+        <div class="detail-body">
+          ${Object.entries(r)
+            .map(
+              ([k, v]) => `
+            <div class="detail-field">
+              <label>${k.replace(/_/g, " ")}</label>
+              <div class="value">${v ?? "—"}</div>
+            </div>`,
+            )
+            .join("")}
+        </div>
+      </div>`;
+        } catch (e) {
+          el.innerHTML = `<div class="error-msg">⚠ ${e.message}</div>`;
+        }
+      }
+
+      function switchRunsTab(tab, btn) {
+        document
+          .querySelectorAll("#page-runs .sub-tab")
+          .forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById("runs-by-runner-filter").style.display =
+          tab === "byRunner" ? "flex" : "none";
+        if (tab === "all") loadRuns();
+      }
+
+      // ── ROUTES ────────────────────────────────────────────────
+      async function loadRoutes() {
+        loading("routes-table");
+        clearError("routes-error");
+        document.getElementById("route-detail").innerHTML = "";
+        try {
+          const data = await apiFetch("/routes");
+          document.getElementById("routes-meta").textContent =
+            `${data.length} records`;
+
+          if (!data.length) {
+            document.getElementById("routes-table").innerHTML =
+              '<div class="empty">No routes found.</div>';
+            return;
+          }
+
+          const surfaceColor = (s) =>
+            ({
+              paved: "badge-green",
+              trail: "badge-orange",
+              track: "badge-gray",
+              mixed: "badge-orange",
+            })[(s || "").toLowerCase()] || "badge-gray";
+
+          document.getElementById("routes-table").innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>ID</th><th>Name</th><th>Distance</th><th>Elevation Gain</th><th>Surface</th><th>Start Location</th><th>Runner</th>
+          </tr></thead>
+          <tbody>
+            ${data
+              .map(
+                (r) => `
+              <tr onclick="loadRouteDetail(${r.route_id})">
+                <td class="td-id">#${r.route_id}</td>
+                <td><strong>${r.route_name}</strong></td>
+                <td>${fmtNum(r.distance_miles, 2)} mi</td>
+                <td>${r.elevation_gain_ft != null ? r.elevation_gain_ft + " ft" : "—"}</td>
+                <td><span class="badge ${surfaceColor(r.surface_type)}">${r.surface_type || "—"}</span></td>
+                <td style="color:var(--muted);font-size:0.78rem">${r.start_location || "—"}</td>
+                <td class="td-id">Runner #${r.runner_id}</td>
+              </tr>
+            `,
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </div>`;
+        } catch (e) {
+          showError("routes-error", e.message);
+          document.getElementById("routes-table").innerHTML = "";
+        }
+      }
+
+      async function loadRouteDetail(id) {
+        const el = document.getElementById("route-detail");
+        el.innerHTML = `<div class="detail-panel"><div class="detail-body"><div class="empty"><span class="spinner"></span></div></div></div>`;
+        try {
+          const r = await apiFetch("/routes/" + id);
+          el.innerHTML = `
+      <div class="detail-panel">
+        <div class="detail-header">
+          <span class="detail-title">Route #${id} — Detail View</span>
+          <button class="close-btn" onclick="document.getElementById('route-detail').innerHTML=''">✕</button>
+        </div>
+        <div class="detail-body">
+          ${Object.entries(r)
+            .map(
+              ([k, v]) => `
+            <div class="detail-field">
+              <label>${k.replace(/_/g, " ")}</label>
+              <div class="value">${v ?? "—"}</div>
+            </div>`,
+            )
+            .join("")}
+        </div>
+      </div>`;
+        } catch (e) {
+          el.innerHTML = `<div class="error-msg">⚠ ${e.message}</div>`;
+        }
+      }
+
+      // ── SHOES ─────────────────────────────────────────────────
+      async function loadShoes() {
+        loading("shoes-table");
+        clearError("shoes-error");
+        document.getElementById("shoe-detail").innerHTML = "";
+        try {
+          const data = await apiFetch("/shoes");
+          document.getElementById("shoes-meta").textContent =
+            `${data.length} records`;
+
+          if (!data.length) {
+            document.getElementById("shoes-table").innerHTML =
+              '<div class="empty">No shoes found.</div>';
+            return;
+          }
+
+          document.getElementById("shoes-table").innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>ID</th><th>Brand</th><th>Model</th><th>Miles</th><th>Status</th><th>Purchased</th><th>Runner</th>
+          </tr></thead>
+          <tbody>
+            ${data
+              .map(
+                (s) => `
+              <tr onclick="loadShoeDetail(${s.shoe_id})">
+                <td class="td-id">#${s.shoe_id}</td>
+                <td><strong>${s.brand}</strong></td>
+                <td>${s.model}</td>
+                <td>${fmtNum(s.total_miles, 1)} mi</td>
+                <td><span class="badge ${s.retired ? "badge-red" : "badge-green"}">${s.retired ? "Retired" : "Active"}</span></td>
+                <td style="color:var(--muted);font-size:0.78rem">${fmtDate(s.purchase_date)}</td>
+                <td class="td-id">Runner #${s.runner_id}</td>
+              </tr>
+            `,
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </div>`;
+        } catch (e) {
+          showError("shoes-error", e.message);
+          document.getElementById("shoes-table").innerHTML = "";
+        }
+      }
+
+      async function loadShoeDetail(id) {
+        const el = document.getElementById("shoe-detail");
+        el.innerHTML = `<div class="detail-panel"><div class="detail-body"><div class="empty"><span class="spinner"></span></div></div></div>`;
+        try {
+          const s = await apiFetch("/shoes/" + id);
+          el.innerHTML = `
+      <div class="detail-panel">
+        <div class="detail-header">
+          <span class="detail-title">Shoe #${id} — Detail View</span>
+          <button class="close-btn" onclick="document.getElementById('shoe-detail').innerHTML=''">✕</button>
+        </div>
+        <div class="detail-body">
+          ${Object.entries(s)
+            .map(
+              ([k, v]) => `
+            <div class="detail-field">
+              <label>${k.replace(/_/g, " ")}</label>
+              <div class="value">${v ?? "—"}</div>
+            </div>`,
+            )
+            .join("")}
+        </div>
+      </div>`;
+        } catch (e) {
+          el.innerHTML = `<div class="error-msg">⚠ ${e.message}</div>`;
+        }
+      }
+
+      // ── GOALS ─────────────────────────────────────────────────
+      async function loadGoals() {
+        loading("goals-table");
+        clearError("goals-error");
+        document.getElementById("goal-detail").innerHTML = "";
+        try {
+          const data = await apiFetch("/goals");
+          renderGoals(data);
+        } catch (e) {
+          showError("goals-error", e.message);
+          document.getElementById("goals-table").innerHTML = "";
+        }
+      }
+
+      async function loadGoalsByRunner() {
+        const id = document.getElementById("goalRunnerIdFilter").value.trim();
+        if (!id) return loadGoals();
+        loading("goals-table");
+        clearError("goals-error");
+        document.getElementById("goal-detail").innerHTML = "";
+        try {
+          const data = await apiFetch("/goals?runner_id=" + id);
+          renderGoals(data, `Runner #${id}`);
+        } catch (e) {
+          showError("goals-error", e.message);
+          document.getElementById("goals-table").innerHTML = "";
+        }
+      }
+
+      function renderGoals(data, subtitle = "") {
+        document.getElementById("goals-meta").textContent = subtitle
+          ? `${data.length} records — ${subtitle}`
+          : `${data.length} records`;
+
+        const active = data.filter((g) => g.status === "active").length;
+        const completed = data.filter((g) => g.status === "completed").length;
+        document.getElementById("goals-stats").innerHTML = `
+    <div class="stat-card"><div class="stat-label">Total Goals</div><div class="stat-value">${data.length}</div></div>
+    <div class="stat-card"><div class="stat-label">Active</div><div class="stat-value">${active}</div></div>
+    <div class="stat-card"><div class="stat-label">Completed</div><div class="stat-value">${completed}</div></div>
+  `;
+
+        if (!data.length) {
+          document.getElementById("goals-table").innerHTML =
+            '<div class="empty">No goals found.</div>';
+          return;
+        }
+
+        const statusBadge = (s) =>
+          ({
+            active: "badge-green",
+            completed: "badge-orange",
+            failed: "badge-red",
+          })[s] || "badge-gray";
+
+        document.getElementById("goals-table").innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>ID</th><th>Runner</th><th>Type</th><th>Target</th><th>Current</th><th>Progress</th><th>Target Date</th><th>Status</th>
+        </tr></thead>
+        <tbody>
+          ${data
+            .map((g) => {
+              const pct = g.target_value
+                ? Math.min(
+                    100,
+                    Math.round((g.current_value / g.target_value) * 100),
+                  )
+                : 0;
+              return `
+              <tr onclick="loadGoalDetail(${g.goal_id})">
+                <td class="td-id">#${g.goal_id}</td>
+                <td class="td-id">Runner #${g.runner_id}</td>
+                <td>${g.goal_type || "—"}</td>
+                <td>${fmtNum(g.target_value, 1)}</td>
+                <td>${fmtNum(g.current_value, 1)}</td>
+                <td>
+                  <div style="display:flex;align-items:center;gap:0.5rem">
+                    <div style="flex:1;background:var(--border);border-radius:2px;height:4px;min-width:60px">
+                      <div style="width:${pct}%;background:var(--accent);height:4px;border-radius:2px;transition:width 0.5s"></div>
+                    </div>
+                    <span style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--muted)">${pct}%</span>
+                  </div>
+                </td>
+                <td style="font-size:0.78rem">${fmtDate(g.target_date)}</td>
+                <td><span class="badge ${statusBadge(g.status)}">${g.status || "—"}</span></td>
+              </tr>`;
+            })
+            .join("")}
+        </tbody>
+      </table>
+    </div>`;
+      }
+
+      async function loadGoalDetail(id) {
+        const el = document.getElementById("goal-detail");
+        el.innerHTML = `<div class="detail-panel"><div class="detail-body"><div class="empty"><span class="spinner"></span></div></div></div>`;
+        try {
+          const g = await apiFetch("/goals/" + id);
+          el.innerHTML = `
+      <div class="detail-panel">
+        <div class="detail-header">
+          <span class="detail-title">Goal #${id} — Detail View</span>
+          <button class="close-btn" onclick="document.getElementById('goal-detail').innerHTML=''">✕</button>
+        </div>
+        <div class="detail-body">
+          ${Object.entries(g)
+            .map(
+              ([k, v]) => `
+            <div class="detail-field">
+              <label>${k.replace(/_/g, " ")}</label>
+              <div class="value">${v ?? "—"}</div>
+            </div>`,
+            )
+            .join("")}
+        </div>
+      </div>`;
+        } catch (e) {
+          el.innerHTML = `<div class="error-msg">⚠ ${e.message}</div>`;
+        }
+      }
+
+      function switchGoalsTab(tab, btn) {
+        document
+          .querySelectorAll("#page-goals .sub-tab")
+          .forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById("goals-by-runner-filter").style.display =
+          tab === "byRunner" ? "flex" : "none";
+        if (tab === "all") loadGoals();
+      }
+
+      // ── INIT ─────────────────────────────────────────────────
+      checkHealth();
+      loadRunners();
+      setInterval(checkHealth, 15000);
+    </script>
+  </body>
+</html>

@@ -1,32 +1,12 @@
-"""
-app.py - Service Layer: Flask REST API
-Exposes all business layer methods as HTTP endpoints.
-
-HOSTING ON RAILWAY:
-  1. Push this project to a GitHub repo.
-  2. Go to https://railway.app and create a new project from your GitHub repo.
-  3. Railway will auto-detect Python. It will look for a Procfile or requirements.txt.
-  4. In Railway Dashboard > Variables, add these environment variables:
-       DB_HOST     = your MySQL host (use Railway MySQL plugin if hosted there)
-       DB_PORT     = 3306
-       DB_NAME     = running_tracker
-       DB_USER     = your db username
-       DB_PASSWORD = your db password
-       PORT        = 5000  (Railway sets this automatically)
-  5. Railway will build and deploy automatically on every git push.
-  6. Your API base URL will be: https://<your-app>.up.railway.app
-
-RUNNING LOCALLY:
-  pip install flask mysql-connector-python
-  python app.py
-"""
 
 import os
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 from business import business_layer as bl
 
 app = Flask(__name__)
+CORS(app)  # Allow cross-origin requests from the browser frontend
 
 
 # ─────────────────────────────────────────────
@@ -40,7 +20,6 @@ def handle_all_exceptions(e):
     receives HTML error pages. Keeps the message minimal for non-HTTP exceptions.
     """
     if isinstance(e, HTTPException):
-        # e.description is user-friendly message for HTTPExceptions
         return jsonify({"success": False, "error": e.description}), e.code
     app.logger.exception("Unhandled exception")
     return jsonify({"success": False, "error": "Internal server error"}), 500
@@ -59,10 +38,8 @@ def to_response(result):
         return jsonify({"success": False, "error": "Internal error"}), 500
 
     if result.get("success"):
-        # default successful responses as 200; creators override to 201 below
         return jsonify(result), 200
     else:
-        # client-level error (bad input, not found, etc.)
         return jsonify(result), 400
 
 
@@ -74,7 +51,6 @@ def _sanitize_surface(surface_type):
     if not s:
         return None
     s_lower = s.lower()
-    # Map a variety of client-provided terms to the DB enum values:
     mapping = {
         "paved": "Road",
         "road": "Road",
@@ -82,15 +58,12 @@ def _sanitize_surface(surface_type):
         "mixed": "Mixed",
         "track": "Track",
         "treadmill": "Treadmill",
-        # helpful fallbacks
         "gravel": "Mixed",
         "dirt": "Trail",
     }
     if s_lower in mapping:
         normalized = mapping[s_lower]
     else:
-        # fallback: title-case and try to keep short. If it doesn't match the enum, DB will raise;
-        # we defensively truncate to avoid overly long strings.
         normalized = s.title()
     if len(normalized) > 255:
         normalized = normalized[:255]
@@ -144,13 +117,13 @@ def create_runner():
             height_inches=data.get("height_inches")
         )
     except Exception as e:
-        # Log full traceback to server console and return exception text in JSON for debugging
         app.logger.exception("Error in create_runner")
         return jsonify({"success": False, "error": f"{type(e).__name__}: {str(e)}"}), 500
 
     if result.get("success"):
         return jsonify(result), 201
     return to_response(result)
+
 
 @app.route("/runners/<int:runner_id>", methods=["PUT"])
 def update_runner(runner_id):
@@ -196,15 +169,11 @@ def get_run(run_id):
 def create_run():
     """POST /runs - Log a new run."""
     data = request.get_json(silent=True) or {}
-
-    # defensive: drop client-supplied generated fields (pace is generated in DB)
     data.pop("pace_min_per_mile", None)
 
-    # basic required-field validation
     if not data.get("runner_id") or data.get("distance_miles") is None or data.get("duration_minutes") is None:
         return jsonify({"success": False, "error": "Missing required fields: runner_id, distance_miles, duration_minutes"}), 400
 
-    # validate numeric values and > 0 to avoid division-by-zero in generated column
     try:
         distance = float(data.get("distance_miles"))
         duration = float(data.get("duration_minutes"))
@@ -216,7 +185,6 @@ def create_run():
     if duration <= 0:
         return jsonify({"success": False, "error": "duration_minutes must be greater than 0"}), 400
 
-    # normalize run_type to DB enum if provided
     run_type = _normalize_run_type(data.get("run_type"))
     if data.get("run_type") and run_type is None:
         return jsonify({"success": False, "error": f"Invalid run_type: {data.get('run_type')}"}), 400
@@ -230,7 +198,6 @@ def create_run():
             run_type=run_type,
             route_id=data.get("route_id"),
             shoe_id=data.get("shoe_id"),
-            # do NOT pass pace_min_per_mile
             average_heart_rate=data.get("average_heart_rate"),
             calories_burned=data.get("calories_burned"),
             weather=data.get("weather"),
@@ -252,10 +219,8 @@ def create_run():
 def update_run(run_id):
     """PUT /runs/<id> - Update a run."""
     data = request.get_json(silent=True) or {}
-    # drop client-provided generated fields
     data.pop("pace_min_per_mile", None)
 
-    # if distance/duration provided, validate them
     if data.get("distance_miles") is not None:
         try:
             distance = float(data.get("distance_miles"))
@@ -272,7 +237,6 @@ def update_run(run_id):
         except (ValueError, TypeError):
             return jsonify({"success": False, "error": "Invalid numeric value for duration_minutes"}), 400
 
-    # normalize run_type if present
     if "run_type" in data:
         run_type = _normalize_run_type(data.get("run_type"))
         if data.get("run_type") and run_type is None:
@@ -283,7 +247,6 @@ def update_run(run_id):
         run_id=run_id,
         distance_miles=data.get("distance_miles"),
         duration_minutes=data.get("duration_minutes"),
-        # do not pass pace_min_per_mile
         average_heart_rate=data.get("average_heart_rate"),
         calories_burned=data.get("calories_burned"),
         notes=data.get("notes")
