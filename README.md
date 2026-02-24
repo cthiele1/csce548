@@ -1,267 +1,133 @@
-# Running Tracker Database Project
+# CSCE 548 - Project 2: Running Tracker API
 
-A comprehensive running tracker application with MySQL database backend and Python console interface. Track your runs, routes, shoes, training goals, and analyze your performance over time.
+A three-layer architecture built with Python and Flask, connecting to the
+MySQL `running_tracker` database from Project 1.
 
-## Project Overview
+## Architecture
 
-This project demonstrates a complete database application with:
-- **5 normalized database tables** with proper relationships
-- **60+ rows of test data** across all tables
-- **Full CRUD operations** for all entities
-- **Console-based user interface** for easy interaction
-- **Advanced features** like statistics, views, and data validation
-
-## Database Schema
-
-### Tables
-
-1. **runners** - Store runner profiles
-   - Fields: runner_id, first_name, last_name, email, date_of_birth, gender, weight_lbs, height_inches
-   - Primary Key: runner_id
-
-2. **running_shoes** - Track running shoe inventory and mileage
-   - Fields: shoe_id, runner_id, brand, model, purchase_date, total_miles, retired, notes
-   - Primary Key: shoe_id
-   - Foreign Key: runner_id → runners(runner_id)
-
-3. **routes** - Store favorite running routes
-   - Fields: route_id, runner_id, route_name, distance_miles, elevation_gain_ft, surface_type, description, start_location
-   - Primary Key: route_id
-   - Foreign Key: runner_id → runners(runner_id)
-
-4. **runs** - Main table storing individual run records
-   - Fields: run_id, runner_id, route_id, shoe_id, run_date, distance_miles, duration_minutes, pace_min_per_mile (calculated), average_heart_rate, calories_burned, weather, temperature_f, run_type, notes
-   - Primary Key: run_id
-   - Foreign Keys: runner_id → runners(runner_id), route_id → routes(route_id), shoe_id → running_shoes(shoe_id)
-   - Computed Column: pace_min_per_mile (duration/distance)
-
-5. **training_goals** - Track training goals and progress
-   - Fields: goal_id, runner_id, goal_type, target_value, current_value, target_date, status, description
-   - Primary Key: goal_id
-   - Foreign Key: runner_id → runners(runner_id)
-
-### Views
-
-- **runner_statistics** - Aggregated running statistics per runner
-- **recent_runs** - Most recent 20 runs across all runners with joined data
+```
+client.py  (Console Front End)
+    ↓  HTTP requests
+app.py  (Service Layer - Flask REST API)
+    ↓  function calls
+business/business_layer.py  (Business Layer - validation & rules)
+    ↓  function calls
+data/data_layer.py  (Data Layer - SQL queries)
+    ↓  MySQL connection
+running_tracker database
+```
 
 ## Project Structure
 
 ```
-running-tracker/
-├── 01_create_database.sql      # Database schema creation script
-├── 02_insert_test_data.sql     # Test data insertion (60+ rows)
-├── config.py                   # Database configuration
-├── database.py                 # Database connection utilities
-├── models/                     # Data Access Layer
-│   ├── __init__.py
-│   ├── runner.py              # Runner CRUD operations
-│   ├── run.py                 # Run CRUD operations
-│   ├── route.py               # Route CRUD operations
-│   ├── shoe.py                # Shoe CRUD operations
-│   └── goal.py                # Training Goal CRUD operations
-├── main.py                     # Console application
-├── requirements.txt            # Python dependencies
-└── README.md                   # This file
+project2/
+├── app.py                    # Flask service layer (REST API)
+├── client.py                 # Console front-end test client
+├── requirements.txt          # Python dependencies
+├── Procfile                  # Railway deployment config
+├── data/
+│   ├── db_connection.py      # Database connection (reads env vars)
+│   └── data_layer.py         # All CRUD SQL operations
+└── business/
+    └── business_layer.py     # Business rules + validation
 ```
 
-## Setup Instructions
+## API Endpoints
 
-### Prerequisites
+| Method | Endpoint           | Description              |
+|--------|--------------------|--------------------------|
+| GET    | /runners           | Get all runners          |
+| GET    | /runners/<id>      | Get one runner           |
+| POST   | /runners           | Add a runner             |
+| PUT    | /runners/<id>      | Update a runner          |
+| DELETE | /runners/<id>      | Delete a runner          |
+| GET    | /runs              | Get all runs             |
+| GET    | /runs?runner_id=X  | Get runs for a runner    |
+| GET    | /runs/<id>         | Get one run              |
+| POST   | /runs              | Log a run                |
+| PUT    | /runs/<id>         | Update a run             |
+| DELETE | /runs/<id>         | Delete a run             |
+| GET    | /routes            | Get all routes           |
+| GET    | /routes/<id>       | Get one route            |
+| POST   | /routes            | Add a route              |
+| PUT    | /routes/<id>       | Update a route           |
+| DELETE | /routes/<id>       | Delete a route           |
+| GET    | /shoes             | Get all shoes            |
+| GET    | /shoes/<id>        | Get one shoe             |
+| POST   | /shoes             | Add a shoe               |
+| PUT    | /shoes/<id>        | Update a shoe            |
+| DELETE | /shoes/<id>        | Delete a shoe            |
+| GET    | /goals             | Get all goals            |
+| GET    | /goals?runner_id=X | Get goals for a runner   |
+| GET    | /goals/<id>        | Get one goal             |
+| POST   | /goals             | Add a goal               |
+| PUT    | /goals/<id>        | Update a goal            |
+| DELETE | /goals/<id>        | Delete a goal            |
+| GET    | /health            | Health check             |
 
-- MySQL Server 8.0+ or MariaDB 10.5+
-- Python 3.8+
-- pip (Python package manager)
+## Local Setup
 
-### Installation Steps
+```bash
+# 1. Install dependencies
+pip install -r requirements.txt
 
-1. **Clone or download this project**
-   ```bash
-   cd running-tracker
-   ```
+# 2. Set environment variables (or create a .env file)
+export DB_HOST=localhost
+export DB_PORT=3306
+export DB_NAME=running_tracker
+export DB_USER=root
+export DB_PASSWORD=yourpassword
 
-2. **Install Python dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
+# 3. Start the Flask server
+python app.py
 
-3. **Configure database connection**
-   - Edit `config.py`
-   - Update the MySQL password and connection details:
-   ```python
-   DB_CONFIG = {
-       'host': 'localhost',
-       'user': 'root',
-       'password': 'YOUR_MYSQL_PASSWORD',  # Change this!
-       'database': 'running_tracker',
-       'raise_on_warnings': True
-   }
-   ```
-
-4. **Create the database and schema**
-   ```bash
-   mysql -u root -p < 01_create_database.sql
-   ```
-
-5. **Load test data**
-   ```bash
-   mysql -u root -p < 02_insert_test_data.sql
-   ```
-
-6. **Verify data loaded successfully**
-   ```bash
-   mysql -u root -p running_tracker -e "SELECT COUNT(*) FROM runs;"
-   ```
-   Should show 60 rows.
-
-7. **Run the application**
-   ```bash
-   python main.py
-   ```
-
-## CRUD Operations
-
-All models implement complete CRUD (Create, Read, Update, Delete) operations:
-
-### Runner Model (`models/runner.py`)
-- `create()` - Add new runner
-- `get_by_id()` - Retrieve runner by ID
-- `get_all()` - Get all runners
-- `search_by_name()` - Search runners by name
-- `update()` - Update runner information
-- `delete()` - Delete runner
-- `get_statistics()` - Get running statistics
-
-### Run Model (`models/run.py`)
-- `create()` - Log new run
-- `get_by_id()` - Retrieve run by ID
-- `get_all()` - Get all runs
-- `get_by_runner()` - Get runs for specific runner
-- `get_by_date_range()` - Get runs in date range
-- `update()` - Update run details
-- `delete()` - Delete run
-- `get_recent_runs()` - Get recent runs view
-- `get_summary_stats()` - Get summary statistics
-
-### Route Model (`models/route.py`)
-- `create()` - Add new route
-- `get_by_id()` - Retrieve route by ID
-- `get_all()` - Get all routes
-- `get_by_runner()` - Get routes for specific runner
-- `search_by_name()` - Search routes by name
-- `update()` - Update route details
-- `delete()` - Delete route
-
-### Running Shoe Model (`models/shoe.py`)
-- `create()` - Add new shoe
-- `get_by_id()` - Retrieve shoe by ID
-- `get_all()` - Get all shoes
-- `get_by_runner()` - Get shoes for specific runner
-- `update()` - Update shoe details
-- `retire_shoe()` - Mark shoe as retired
-- `delete()` - Delete shoe
-- `get_shoes_needing_replacement()` - Find high-mileage shoes
-
-### Training Goal Model (`models/goal.py`)
-- `create()` - Create new goal
-- `get_by_id()` - Retrieve goal by ID
-- `get_all()` - Get all goals
-- `get_by_runner()` - Get goals for specific runner
-- `update()` - Update goal details
-- `update_progress()` - Update progress value
-- `complete_goal()` - Mark goal as completed
-- `abandon_goal()` - Mark goal as abandoned
-- `delete()` - Delete goal
-
-## Using the Console Application
-
-The application provides an intuitive menu-driven interface:
-
-```
-Main Menu
-----------------------------------------
-  1. Runner Management
-  2. Run Management
-  3. Route Management
-  4. Shoe Management
-  5. Training Goal Management
-  0. Exit
+# 4. In a new terminal, run the test client
+python client.py
 ```
 
-### Example Workflows
+## Deploying to Railway
 
-**Viewing Your Running Statistics:**
-1. Select "1" (Runner Management)
-2. Select "2" (View runner details)
-3. Enter your runner ID
-4. View total runs, miles, pace statistics
+1. **Push to GitHub**: Commit all files and push to your GitHub repo.
 
-**Logging a New Run:**
-1. Select "2" (Run Management)
-2. Select "3" (Add new run)
-3. Enter run details (date, distance, time, etc.)
-4. System automatically calculates pace
+2. **Create Railway Project**:
+   - Go to https://railway.app and sign in
+   - Click "New Project" → "Deploy from GitHub repo"
+   - Select your `csce548` repository
 
-**Tracking Shoe Mileage:**
-1. Select "4" (Shoe Management)
-2. Select "6" (Check shoes needing replacement)
-3. View shoes over mileage threshold
+3. **Add MySQL Database** (if not already hosted elsewhere):
+   - In your Railway project, click "New" → "Database" → "MySQL"
+   - Railway will provision a MySQL instance automatically
 
-## Test Data
+4. **Set Environment Variables**:
+   - In Railway Dashboard → your service → "Variables"
+   - Add the following:
+     ```
+     DB_HOST     = <from Railway MySQL plugin - use MYSQLHOST variable>
+     DB_PORT     = 3306
+     DB_NAME     = running_tracker
+     DB_USER     = <from Railway MySQL plugin - use MYSQLUSER>
+     DB_PASSWORD = <from Railway MySQL plugin - use MYSQLPASSWORD>
+     ```
+   - Tip: Railway's MySQL plugin auto-exposes `$MYSQLHOST`, `$MYSQLUSER`,
+     `$MYSQLPASSWORD`, `$MYSQLPORT`, `$MYSQLDATABASE` — you can reference
+     these directly in the Variables tab.
 
-The database includes realistic test data:
-- **5 runners** with different profiles
-- **10 pairs of running shoes** across different brands
-- **12 running routes** with varied terrain
-- **60 run records** from January-February 2025
-- **8 training goals** with different objectives
+5. **Deploy**:
+   - Railway will detect the `Procfile` and run `python app.py`
+   - Your app will be live at `https://<your-app-name>.up.railway.app`
 
-## Database Features
+6. **Test the deployment**:
+   ```bash
+   BASE_URL=https://your-app.up.railway.app python client.py
+   ```
 
-### Indexes
-- Email lookup on runners
-- Runner-date composite index on runs
-- Route and shoe lookups optimized
+## Business Rules Enforced
 
-### Constraints
-- Foreign key relationships with CASCADE delete
-- Email uniqueness on runners
-- NOT NULL constraints on critical fields
-
-### Generated Columns
-- Pace automatically calculated from distance/duration
-
-### Views
-- Pre-aggregated statistics for performance
-- Recent runs with joined data for reports
-
-## Screenshots Required for Assignment
-
-1. **Database Diagram** - Use MySQL Workbench to generate ERD
-2. **Row Count Verification** - Run `SELECT COUNT(*) FROM runs;` (should show 60+)
-3. **Console Application Running** - Screenshot of main menu
-4. **Data Retrieval** - Screenshot showing runner statistics or run list
-
-## Extension Ideas
-
-- Add web interface using Flask
-- Implement data visualization with matplotlib
-- Add GPS/GPX file import
-- Create mobile app interface
-- Add weather API integration
-- Implement training plan generator
-
-## Technologies Used
-
-- **Database**: MySQL 8.0
-- **Language**: Python 3.8+
-- **Database Connector**: mysql-connector-python
-- **Architecture**: MVC pattern with Data Access Layer
-
-## License
-
-This is an educational project created for database course requirements.
-
-## Author
-
-Created for CS Database Course - Running Tracker Project
+- Runners require a valid email address with '@'
+- Run distance and duration must be positive numbers
+- Pace is auto-calculated if not provided (`duration / distance`)
+- Heart rate above 220 bpm is rejected
+- Shoes with 300+ miles trigger a replacement warning
+- Training goals cannot have a past target date
+- Goals are auto-marked "completed" when current_value >= target_value
+- Goal progress percentage is calculated on retrieval
